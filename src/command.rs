@@ -39,8 +39,13 @@ impl Command {
                 }
                 match (&args[0], &args[1]) {
                     (Value::String(key), Value::String(value)) => {
-                        let db = Arc::get_mut(db).unwrap();
-                        db.set(key.to_owned(), value.to_owned());
+                        match Arc::get_mut(db) {
+                            Some(db) => db.set(key.to_owned(), value.to_owned()),
+                            None => {
+                                eprintln!("unable to get mutable reference to database");
+                                return None;
+                            }
+                        }
                         Some("OK".to_string())
                     }
                     _ => {
