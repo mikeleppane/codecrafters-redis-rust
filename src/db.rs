@@ -58,7 +58,7 @@ impl Database for RedisDatabase {
                 value,
                 expires_at: Some(expires_at),
             }) => {
-                if expires_at > &SystemTime::now() {
+                if expires_at < &SystemTime::now() {
                     GetValue::Error(value.clone())
                 } else {
                     GetValue::Ok(value.clone())
