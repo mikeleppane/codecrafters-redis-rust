@@ -29,6 +29,14 @@ fn encode_response(response: &[u8]) -> Vec<u8> {
     buffer
 }
 
+fn encode_response2(response: &[u8]) -> Vec<u8> {
+    let mut buffer = Vec::new();
+    buffer.extend_from_slice(b"$");
+    buffer.extend_from_slice(response);
+    buffer.extend_from_slice(b"\r\n");
+    buffer
+}
+
 fn parse(data: &[u8]) -> Option<Value> {
     let mut parser = RespParser::new(data);
     let (value, _) = parser.parse();
@@ -78,11 +86,11 @@ async fn handle_connection<T: Database>(mut stream: TcpStream, db: Arc<Mutex<T>>
                 let value = _db.get(&key);
                 match value {
                     GetValue::Error(tt) => {
-                        dbg!("error");
-                        dbg!(tt);
                         let mut db = db.lock().unwrap();
                         db.delete(&key);
-                        stream.write_all("$-1\r\n".as_bytes()).unwrap();
+                        stream
+                            .write_all(encode_response("$-1\r\n".as_bytes()).as_slice())
+                            .unwrap();
                     }
                     GetValue::Ok(value) => {
                         stream
