@@ -1,30 +1,17 @@
-use crate::{
-    db::{Database, RedisDatabase},
-    response::Value,
-};
+use crate::response::Value;
 
 pub enum Command {
-    Ping,
-    Echo,
-    Set,
-    Get,
+    Ping(String),
+    Echo(String),
+    Set(String, String),
+    Get(String),
 }
 
 impl Command {
-    fn from_str(string: &str) -> Option<Command> {
-        match string.to_uppercase().as_str() {
-            "PING" => Some(Command::Ping),
-            "ECHO" => Some(Command::Echo),
-            "SET" => Some(Command::Set),
-            "GET" => Some(Command::Get),
-            _ => None,
-        }
-    }
-
-    pub fn process(&self, args: &[Value], db: &mut RedisDatabase) -> Option<String> {
-        match self {
-            Command::Ping => Some("PONG".to_string()),
-            Command::Echo => Some(
+    pub fn process(name: &str, args: &[Value]) -> Option<Command> {
+        match name.to_uppercase().as_str() {
+            "PING" => Some(Command::Ping("PONG".to_string())),
+            "ECHO" => Some(Command::Echo(
                 args.iter()
                     .map(|arg| match arg {
                         Value::String(string) => string.clone(),
@@ -32,16 +19,15 @@ impl Command {
                     })
                     .collect::<Vec<String>>()
                     .join(" "),
-            ),
-            Command::Set => {
+            )),
+            "SET" => {
                 if args.len() != 2 {
                     eprintln!("wrong number of arguments for 'set' command");
                     return None;
                 }
                 match (&args[0], &args[1]) {
                     (Value::String(key), Value::String(value)) => {
-                        db.set(key.clone(), value.clone());
-                        Some("OK".to_string())
+                        Some(Command::Set(key.clone(), value.clone()))
                     }
                     _ => {
                         eprintln!("wrong type of arguments for 'set' command");
@@ -49,39 +35,31 @@ impl Command {
                     }
                 }
             }
-            Command::Get => {
+            "GET" => {
                 if args.len() != 1 {
                     eprintln!("wrong number of arguments for 'get' command");
                     return None;
                 }
                 match &args[0] {
-                    Value::String(key) => {
-                        let value = db.get(key);
-                        match value {
-                            Some(value) => Some(value),
-                            None => Some("".to_string()),
-                        }
-                    }
+                    Value::String(key) => Some(Command::Get(key.clone())),
                     _ => {
                         eprintln!("wrong type of arguments for 'get' command");
                         None
                     }
                 }
             }
+            _ => {
+                eprintln!("unknown command '{}'", name);
+                None
+            }
         }
     }
 
-    pub fn handle_command(value: &[Value], db: &mut RedisDatabase) -> Option<String> {
+    pub fn handle_command(value: &[Value]) -> Option<Command> {
         let command_name = &value[0];
         let command_args = &value[1..];
         match command_name {
-            Value::String(string) => match Command::from_str(string) {
-                Some(command) => command.process(command_args, db),
-                None => {
-                    eprintln!("unknown command: {}", string);
-                    None
-                }
-            },
+            Value::String(name) => Command::process(name, command_args),
             _ => {
                 eprintln!("unexpected token: {:?}", command_name);
                 None

@@ -2,14 +2,14 @@ use anyhow::Result;
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 mod command;
 mod db;
 mod response;
 use command::Command;
-use db::RedisDatabase;
+use db::{Database, RedisDatabase};
 use response::{RespParser, Value};
 
 fn read_from_stream(stream: &mut TcpStream) -> Option<Vec<u8>> {
@@ -35,10 +35,10 @@ fn parse(data: &[u8]) -> Option<Value> {
     value
 }
 
-fn process_request(request: &[u8], db: &mut RedisDatabase) -> Option<String> {
+fn process_request(request: &[u8]) -> Option<Command> {
     let value = parse(request);
     match value {
-        Some(Value::Array(array)) => Command::handle_command(&array, db),
+        Some(Value::Array(array)) => Command::handle_command(&array),
         _ => {
             eprintln!("unable to parse request");
             None
@@ -46,18 +46,44 @@ fn process_request(request: &[u8], db: &mut RedisDatabase) -> Option<String> {
     }
 }
 
-async fn handle_connection(mut stream: TcpStream, db: &mut Arc<RedisDatabase>) -> Result<()> {
-    let db = Arc::get_mut(db).unwrap();
+async fn handle_connection<T: Database>(mut stream: TcpStream, db: Arc<Mutex<T>>) -> Result<()> {
     while let Some(request) = read_from_stream(&mut stream) {
         if request.is_empty() {
             break;
         }
-        let response = process_request(&request, db);
+        let response = process_request(&request);
         match response {
-            Some(response) => {
+            Some(Command::Ping(response)) => {
                 stream
                     .write_all(encode_response(response.as_bytes()).as_slice())
                     .unwrap();
+            }
+
+            Some(Command::Echo(response)) => {
+                stream
+                    .write_all(encode_response(response.as_bytes()).as_slice())
+                    .unwrap();
+            }
+
+            Some(Command::Set(key, value)) => {
+                let mut db = db.lock().unwrap();
+                db.set(key, value);
+                stream.write_all(encode_response(b"OK").as_slice()).unwrap();
+            }
+
+            Some(Command::Get(key)) => {
+                let db = db.lock().unwrap();
+                let value = db.get(&key);
+                match value {
+                    Some(value) => {
+                        stream
+                            .write_all(encode_response(value.as_bytes()).as_slice())
+                            .unwrap();
+                    }
+                    None => {
+                        stream.write_all(encode_response(b"").as_slice()).unwrap();
+                    }
+                }
             }
             None => stream
                 .write_all(b"-ERR unknown command\r\n")
@@ -73,14 +99,14 @@ async fn main() -> Result<()> {
         panic!("failed to bind to socket: {}", e);
     });
 
-    let db = Arc::new(RedisDatabase::new());
+    let db = Arc::new(Mutex::new(RedisDatabase::new()));
 
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                let mut db = Arc::clone(&db);
+                let db = Arc::clone(&db);
                 tokio::task::spawn(async move {
-                    let _ = handle_connection(stream, &mut db).await;
+                    let _ = handle_connection(stream, db).await;
                 });
             }
             Err(e) => {
