@@ -29,14 +29,6 @@ fn encode_response(response: &[u8]) -> Vec<u8> {
     buffer
 }
 
-fn encode_response2(response: &[u8]) -> Vec<u8> {
-    let mut buffer = Vec::new();
-    buffer.extend_from_slice(b"$");
-    buffer.extend_from_slice(response);
-    buffer.extend_from_slice(b"\r\n");
-    buffer
-}
-
 fn parse(data: &[u8]) -> Option<Value> {
     let mut parser = RespParser::new(data);
     let (value, _) = parser.parse();
