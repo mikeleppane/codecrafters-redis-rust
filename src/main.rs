@@ -2,11 +2,14 @@ use anyhow::Result;
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
+    sync::Arc,
 };
 
 mod command;
+mod db;
 mod response;
 use command::Command;
+use db::{Database, RedisDatabase};
 use response::{RespParser, Value};
 
 fn read_from_stream(stream: &mut TcpStream) -> Option<Vec<u8>> {
@@ -32,10 +35,10 @@ fn parse(data: &[u8]) -> Option<Value> {
     value
 }
 
-fn process_request(request: &[u8]) -> Option<String> {
+fn process_request<T: Database>(request: &[u8], db: &mut Arc<T>) -> Option<String> {
     let value = parse(request);
     match value {
-        Some(Value::Array(array)) => Command::handle_command(&array),
+        Some(Value::Array(array)) => Command::handle_command(&array, db),
         _ => {
             eprintln!("unable to parse request");
             None
@@ -43,12 +46,13 @@ fn process_request(request: &[u8]) -> Option<String> {
     }
 }
 
-async fn handle_connection(mut stream: TcpStream) -> Result<()> {
+async fn handle_connection<T: Database>(mut stream: TcpStream, db: Arc<T>) -> Result<()> {
+    let mut db = db;
     while let Some(request) = read_from_stream(&mut stream) {
         if request.is_empty() {
             break;
         }
-        let response = process_request(&request);
+        let response = process_request(&request, &mut db);
         match response {
             Some(response) => {
                 stream
@@ -69,11 +73,14 @@ async fn main() -> Result<()> {
         panic!("failed to bind to socket: {}", e);
     });
 
+    let db = Arc::new(RedisDatabase::new());
+
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
+                let db = Arc::clone(&db);
                 tokio::task::spawn(async move {
-                    let _ = handle_connection(stream).await;
+                    let _ = handle_connection(stream, db).await;
                 });
             }
             Err(e) => {
