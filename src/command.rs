@@ -21,6 +21,7 @@ impl Command {
                     .join(" "),
             )),
             "SET" => {
+                dbg!(args);
                 if args.len() != 2 {
                     eprintln!("wrong number of arguments for 'set' command");
                     return None;
