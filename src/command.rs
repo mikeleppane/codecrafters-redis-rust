@@ -7,8 +7,7 @@ pub enum Command {
 
 impl Command {
     fn from_str(string: &str) -> Option<Command> {
-        dbg!(string);
-        match string {
+        match string.to_uppercase().as_str() {
             "PING" => Some(Command::Ping),
             "ECHO" => Some(Command::Echo),
             _ => None,
