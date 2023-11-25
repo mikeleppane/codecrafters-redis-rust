@@ -85,12 +85,10 @@ async fn handle_connection<T: Database>(mut stream: TcpStream, db: Arc<Mutex<T>>
                 let _db = db.lock().unwrap();
                 let value = _db.get(&key);
                 match value {
-                    GetValue::Error(tt) => {
+                    GetValue::Error(_) => {
                         let mut db = db.lock().unwrap();
                         db.delete(&key);
-                        stream
-                            .write_all(encode_response("$-1\r\n".as_bytes()).as_slice())
-                            .unwrap();
+                        stream.write_all(b"$-1\r\n").unwrap();
                     }
                     GetValue::Ok(value) => {
                         stream
