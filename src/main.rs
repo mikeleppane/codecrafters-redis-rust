@@ -9,7 +9,7 @@ mod command;
 mod db;
 mod response;
 use command::Command;
-use db::{Database, RedisDatabase};
+use db::RedisDatabase;
 use response::{RespParser, Value};
 
 fn read_from_stream(stream: &mut TcpStream) -> Option<Vec<u8>> {
@@ -35,7 +35,7 @@ fn parse(data: &[u8]) -> Option<Value> {
     value
 }
 
-fn process_request<T: Database>(request: &[u8], db: &mut Arc<T>) -> Option<String> {
+fn process_request(request: &[u8], db: &mut RedisDatabase) -> Option<String> {
     let value = parse(request);
     match value {
         Some(Value::Array(array)) => Command::handle_command(&array, db),
@@ -46,13 +46,13 @@ fn process_request<T: Database>(request: &[u8], db: &mut Arc<T>) -> Option<Strin
     }
 }
 
-async fn handle_connection<T: Database>(mut stream: TcpStream, db: Arc<T>) -> Result<()> {
-    let mut db = db;
+async fn handle_connection(mut stream: TcpStream, db: &mut Arc<RedisDatabase>) -> Result<()> {
+    let db = Arc::get_mut(db).unwrap();
     while let Some(request) = read_from_stream(&mut stream) {
         if request.is_empty() {
             break;
         }
-        let response = process_request(&request, &mut db);
+        let response = process_request(&request, db);
         match response {
             Some(response) => {
                 stream
@@ -78,9 +78,9 @@ async fn main() -> Result<()> {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                let db = Arc::clone(&db);
+                let mut db = Arc::clone(&db);
                 tokio::task::spawn(async move {
-                    let _ = handle_connection(stream, db).await;
+                    let _ = handle_connection(stream, &mut db).await;
                 });
             }
             Err(e) => {

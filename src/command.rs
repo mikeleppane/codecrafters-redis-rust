@@ -1,6 +1,7 @@
-use std::sync::Arc;
-
-use crate::{db::Database, response::Value};
+use crate::{
+    db::{Database, RedisDatabase},
+    response::Value,
+};
 
 pub enum Command {
     Ping,
@@ -20,7 +21,7 @@ impl Command {
         }
     }
 
-    pub fn process<T: Database>(&self, args: &[Value], db: &mut Arc<T>) -> Option<String> {
+    pub fn process(&self, args: &[Value], db: &mut RedisDatabase) -> Option<String> {
         match self {
             Command::Ping => Some("PONG".to_string()),
             Command::Echo => Some(
@@ -39,13 +40,7 @@ impl Command {
                 }
                 match (&args[0], &args[1]) {
                     (Value::String(key), Value::String(value)) => {
-                        match Arc::get_mut(db) {
-                            Some(db) => db.set(key.to_owned(), value.to_owned()),
-                            None => {
-                                eprintln!("unable to get mutable reference to database");
-                                return None;
-                            }
-                        }
+                        db.set(key.clone(), value.clone());
                         Some("OK".to_string())
                     }
                     _ => {
@@ -76,7 +71,7 @@ impl Command {
         }
     }
 
-    pub fn handle_command<T: Database>(value: &[Value], db: &mut Arc<T>) -> Option<String> {
+    pub fn handle_command(value: &[Value], db: &mut RedisDatabase) -> Option<String> {
         let command_name = &value[0];
         let command_args = &value[1..];
         match command_name {
