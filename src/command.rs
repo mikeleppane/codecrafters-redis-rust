@@ -7,6 +7,7 @@ pub enum Command {
 
 impl Command {
     fn from_str(string: &str) -> Option<Command> {
+        dbg!(string);
         match string {
             "PING" => Some(Command::Ping),
             "ECHO" => Some(Command::Echo),
