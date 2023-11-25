@@ -1,30 +1,12 @@
+use anyhow::Result;
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
 };
 
-use anyhow::Result;
+mod response;
 
-fn contains(haystack: &[u8], needle: &[u8]) -> bool {
-    haystack
-        .windows(needle.len())
-        .any(|window| window == needle)
-}
-
-fn parse_request(request: &[u8]) -> bool {
-    match request[0] {
-        b'*' => {
-            let size_end = request.iter().position(|&x| x == b'\r').unwrap();
-            let _array_size = std::str::from_utf8(&request[1..size_end])
-                .unwrap()
-                .parse::<usize>()
-                .unwrap();
-
-            contains(request, b"PING") || contains(request, b"ping")
-        }
-        _ => false,
-    }
-}
+use response::{RespParser, Value};
 
 fn read_from_stream(stream: &mut TcpStream) -> Option<Vec<u8>> {
     let mut buf = [0; 512];
@@ -35,17 +17,71 @@ fn read_from_stream(stream: &mut TcpStream) -> Option<Vec<u8>> {
     }
 }
 
+fn encode_response(response: &[u8]) -> Vec<u8> {
+    let mut buffer = Vec::new();
+    buffer.extend_from_slice(b"+");
+    buffer.extend_from_slice(response);
+    buffer.extend_from_slice(b"\r\n");
+    buffer
+}
+
+fn parse(data: &[u8]) -> Option<Value> {
+    let mut parser = RespParser::new(data);
+    let (value, _) = parser.parse();
+    value
+}
+
+fn process_command(command: Vec<Value>) -> Option<String> {
+    let command_name = &command[0];
+    let command_args = &command[1..];
+    match command_name {
+        Value::String(string) => match string.to_lowercase().as_str() {
+            "ping" => Some("PONG".to_string()),
+            "echo" => command_args
+                .iter()
+                .map(|arg| match arg {
+                    Value::String(string) => string.clone(),
+                    _ => "".to_string(),
+                })
+                .collect::<Vec<String>>()
+                .join(" ")
+                .into(),
+            _ => {
+                eprintln!("unknown command: {}", string);
+                None
+            }
+        },
+        _ => {
+            eprintln!("unexpected token: {:?}", command_name);
+            None
+        }
+    }
+}
+
+fn process_request(request: &[u8]) -> Option<String> {
+    let value = parse(request);
+    match value {
+        Some(Value::Array(array)) => process_command(array),
+        _ => {
+            println!("unable to parse request");
+            None
+        }
+    }
+}
+
 async fn handle_connection(mut stream: TcpStream) -> Result<()> {
     while let Some(request) = read_from_stream(&mut stream) {
         if request.is_empty() {
             break;
         }
-        let is_ping = parse_request(&request);
-        match is_ping {
-            true => {
-                stream.write_all(b"+PONG\r\n").unwrap();
+        let response = process_request(&request);
+        match response {
+            Some(response) => {
+                stream
+                    .write_all(encode_response(response.as_bytes()).as_slice())
+                    .unwrap();
             }
-            false => {
+            None => {
                 stream.write_all(b"-ERR unknown command\r\n").unwrap();
             }
         }
@@ -67,7 +103,7 @@ async fn main() -> Result<()> {
                 });
             }
             Err(e) => {
-                println!("error: {}", e);
+                eprintln!("failed to read stream:  {e}");
             }
         }
     }
