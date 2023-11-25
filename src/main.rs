@@ -35,8 +35,8 @@ fn read_from_stream(stream: &mut TcpStream) -> Option<Vec<u8>> {
     }
 }
 
-fn handle_connection(stream: &mut TcpStream) -> Result<()> {
-    while let Some(request) = read_from_stream(stream) {
+async fn handle_connection(mut stream: TcpStream) -> Result<()> {
+    while let Some(request) = read_from_stream(&mut stream) {
         if request.is_empty() {
             break;
         }
@@ -53,17 +53,17 @@ fn handle_connection(stream: &mut TcpStream) -> Result<()> {
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<()> {
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap_or_else(|e| {
         panic!("failed to bind to socket: {}", e);
     });
 
     for stream in listener.incoming() {
         match stream {
-            Ok(mut stream) => {
-                println!("accepted new connection");
-                handle_connection(&mut stream).unwrap_or_else(|e| {
-                    println!("failed to handle connection: {}", e);
+            Ok(stream) => {
+                tokio::task::spawn(async move {
+                    let _ = handle_connection(stream).await;
                 });
             }
             Err(e) => {
@@ -71,4 +71,5 @@ fn main() {
             }
         }
     }
+    Ok(())
 }
