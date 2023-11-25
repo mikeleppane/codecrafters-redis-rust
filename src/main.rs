@@ -91,9 +91,9 @@ async fn handle_connection<T: Database>(mut stream: TcpStream, db: Arc<Mutex<T>>
                     GetValue::None => {}
                 }
             }
-            None => stream
-                .write_all(b"-ERR unknown command\r\n")
-                .expect("could not write to stream"),
+            None => {} /* stream
+                       .write_all(b"-ERR unknown command\r\n")
+                       .expect("could not write to stream"), */
         }
     }
     Ok(())
