@@ -8,8 +8,8 @@ use std::{
 mod command;
 mod db;
 mod response;
-use command::Command;
-use db::{Database, RedisDatabase};
+use command::{Command, SetCommand};
+use db::{Database, GetValue, RedisDatabase};
 use response::{RespParser, Value};
 
 fn read_from_stream(stream: &mut TcpStream) -> Option<Vec<u8>> {
@@ -65,9 +65,11 @@ async fn handle_connection<T: Database>(mut stream: TcpStream, db: Arc<Mutex<T>>
                     .unwrap();
             }
 
-            Some(Command::Set(key, value)) => {
+            Some(Command::Set(set_command)) => {
+                let SetCommand { key, value, px } = set_command;
                 let mut db = db.lock().unwrap();
-                db.set(key, value);
+
+                db.set(key, value, px);
                 stream.write_all(encode_response(b"OK").as_slice()).unwrap();
             }
 
@@ -75,13 +77,20 @@ async fn handle_connection<T: Database>(mut stream: TcpStream, db: Arc<Mutex<T>>
                 let db = db.lock().unwrap();
                 let value = db.get(&key);
                 match value {
-                    Some(value) => {
+                    GetValue::Error(_) => {
+                        stream
+                            .write_all(encode_response("-1\r\n".as_bytes()).as_slice())
+                            .unwrap();
+                    }
+                    GetValue::Ok(value) => {
                         stream
                             .write_all(encode_response(value.as_bytes()).as_slice())
                             .unwrap();
                     }
-                    None => {
-                        stream.write_all(encode_response(b"").as_slice()).unwrap();
+                    GetValue::None => {
+                        stream
+                            .write_all(encode_response("$-1\r\n".as_bytes()).as_slice())
+                            .unwrap();
                     }
                 }
             }
