@@ -79,9 +79,9 @@ async fn handle_connection<T: Database>(mut stream: TcpStream, db: Arc<Mutex<T>>
                 dbg!(&value);
                 match value {
                     GetValue::Error(_) => {
+                        stream.write_all(b"$-1\r\n").unwrap();
                         let mut db = db.lock().unwrap();
                         db.delete(&key);
-                        stream.write_all(b"$-1\r\n").unwrap();
                     }
                     GetValue::Ok(value) => {
                         stream
