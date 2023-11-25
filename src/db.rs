@@ -3,6 +3,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+#[derive(Debug)]
 pub enum GetValue {
     Ok(String),
     None,
