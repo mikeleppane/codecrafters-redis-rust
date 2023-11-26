@@ -133,6 +133,7 @@ async fn handle_connection<T: Database>(
 
                 if keys.as_str() == "*" {
                     if let Some(path) = config.to_file_path() {
+                        dbg!(&path);
                         let file = File::open(path)?;
                         let mut reader = io::BufReader::new(file);
                         let mut buffer: [u8; 512] = [0; 512]; // create a buffer
