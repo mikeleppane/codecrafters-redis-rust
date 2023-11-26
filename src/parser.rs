@@ -97,6 +97,7 @@ impl RDBParser<'_> {
     fn parse_body(&mut self, rdb: &mut RDB) -> Result<(), RDBError> {
         loop {
             let byte = self.read_byte()?;
+            dbg!(byte);
             match byte {
                 0xFF => break,
                 0xFE => {
@@ -113,6 +114,12 @@ impl RDBParser<'_> {
                     rdb.select_db(db);
                     rdb.set_expiry_ms(expires);
                 }
+                0xFA => {
+                    let db = self.read_length()?;
+                    rdb.select_db(db);
+                    rdb.set_expiry(0);
+                }
+
                 _ => {
                     let db = rdb.current_db();
                     let expires = rdb.current_expiry();
