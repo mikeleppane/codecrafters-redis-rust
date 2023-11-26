@@ -3,7 +3,7 @@ use clap::Parser;
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
@@ -23,10 +23,10 @@ use response::{RespParser, Value};
 pub struct Args {
     /// Execute all solutions
     #[arg(short, long)]
-    pub dir: PathBuf,
+    pub dir: Option<PathBuf>,
     /// Execute particular day between 1..25
     #[arg(short, long)]
-    pub dbfilename: String,
+    pub dbfilename: Option<String>,
 }
 
 fn read_from_stream(stream: &mut TcpStream) -> Option<Vec<u8>> {
