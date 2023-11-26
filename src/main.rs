@@ -1,7 +1,9 @@
 use anyhow::Result;
+use clap::Parser;
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -11,6 +13,21 @@ mod response;
 use command::{Command, SetCommand};
 use db::{Database, GetValue, RedisDatabase};
 use response::{RespParser, Value};
+
+#[derive(Parser, Debug)]
+#[clap(
+    author = "Mikko Leppänen <mleppan23@gmail.com>",
+    version = "0.1",
+    about
+)]
+pub struct Args {
+    /// Execute all solutions
+    #[arg(short, long)]
+    pub dir: PathBuf,
+    /// Execute particular day between 1..25
+    #[arg(short, long)]
+    pub dbfilename: String,
+}
 
 fn read_from_stream(stream: &mut TcpStream) -> Option<Vec<u8>> {
     let mut buf = [0; 1024];
@@ -103,6 +120,10 @@ async fn main() -> Result<()> {
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap_or_else(|e| {
         panic!("failed to bind to socket: {}", e);
     });
+
+    let args = Args::parse();
+
+    dbg!(args);
 
     let db = Arc::new(Mutex::new(RedisDatabase::new()));
 
