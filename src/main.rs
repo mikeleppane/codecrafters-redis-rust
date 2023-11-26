@@ -8,11 +8,14 @@ use std::{
 };
 
 mod command;
+mod config;
 mod db;
 mod response;
 use command::{Command, SetCommand};
 use db::{Database, GetValue, RedisDatabase};
 use response::{RespParser, Value};
+
+use crate::config::Config;
 
 #[derive(Parser, Debug)]
 #[clap(
@@ -21,10 +24,10 @@ use response::{RespParser, Value};
     about
 )]
 pub struct Args {
-    /// Execute all solutions
+    /// The directory where RDB files are stored
     #[arg(short, long)]
     pub dir: Option<PathBuf>,
-    /// Execute particular day between 1..25
+    /// The name of the RDB files
     #[arg(short, long)]
     pub dbfilename: Option<String>,
 }
@@ -63,7 +66,11 @@ fn process_request(request: &[u8]) -> Option<Command> {
     }
 }
 
-async fn handle_connection<T: Database>(mut stream: TcpStream, db: Arc<Mutex<T>>) -> Result<()> {
+async fn handle_connection<T: Database>(
+    mut stream: TcpStream,
+    db: Arc<Mutex<T>>,
+    config: Arc<Mutex<Config>>,
+) -> Result<()> {
     while let Some(request) = read_from_stream(&mut stream) {
         if request.is_empty() {
             break;
@@ -107,6 +114,18 @@ async fn handle_connection<T: Database>(mut stream: TcpStream, db: Arc<Mutex<T>>
                     GetValue::None => {}
                 }
             }
+
+            Some(Command::Config(config_key)) => {
+                let config = config.lock().unwrap();
+                if let Some(config_value) = config.get(&config_key) {
+                    stream
+                        .write_all(config.encode_to_resp(&config_key, config_value).as_slice())
+                        .unwrap();
+                } else {
+                    stream.write_all(b"$-1\r\n").unwrap();
+                }
+            }
+
             None => stream
                 .write_all(b"-ERR unknown command\r\n")
                 .expect("could not write to stream"),
@@ -123,16 +142,16 @@ async fn main() -> Result<()> {
 
     let args = Args::parse();
 
-    dbg!(args);
-
     let db = Arc::new(Mutex::new(RedisDatabase::new()));
+    let config = Arc::new(Mutex::new(Config::new(args.dir, args.dbfilename)));
 
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 let db = Arc::clone(&db);
+                let config = Arc::clone(&config);
                 tokio::task::spawn(async move {
-                    let _ = handle_connection(stream, db).await;
+                    let _ = handle_connection(stream, db, config).await;
                 });
             }
             Err(e) => {

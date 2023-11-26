@@ -17,6 +17,7 @@ pub enum Command {
     Echo(String),
     Set(SetCommand),
     Get(String),
+    Config(String),
 }
 
 impl Command {
@@ -106,6 +107,20 @@ impl Command {
                     }
                 }
             }
+            "CONFIG" => match args[0].to_string().to_uppercase().as_str() {
+                "GET" => match &args[1] {
+                    Value::String(config_value) => Some(Command::Config(config_value.clone())),
+                    _ => {
+                        eprintln!("wrong type of arguments for 'config' command");
+                        None
+                    }
+                },
+                _ => {
+                    eprintln!("unknown command '{}'", name);
+                    None
+                }
+            },
+
             _ => {
                 eprintln!("unknown command '{}'", name);
                 None
