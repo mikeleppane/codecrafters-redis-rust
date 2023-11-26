@@ -145,8 +145,6 @@ async fn handle_connection<T: Database>(
                         } else {
                             dbg!("error while parsing header");
                         }
-
-                        println!("{:#04X?}", buffer);
                     }
                 }
             }

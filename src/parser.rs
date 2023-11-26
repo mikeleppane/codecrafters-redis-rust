@@ -1,16 +1,19 @@
 use crate::response::Value;
 
+#[derive(thiserror::Error, Debug)]
 pub enum RDBError {
+    #[error("invalid magic number")]
     InvalidMagicNumber,
+    #[error("invalid version")]
     InvalidVersion,
-    UnexpectedEOF,
-    InvalidString,
+    #[error("invalid length")]
     InvalidLength,
-    InvalidExpiry,
-    InvalidChecksum,
+    #[error("invalid string")]
+    InvalidString,
+    #[error("invalid type")]
     InvalidType,
-    InvalidEncoding,
-    InvalidAuxField,
+    #[error("unexpected EOF")]
+    UnexpectedEOF,
 }
 
 #[derive(Debug)]
@@ -73,7 +76,7 @@ impl RDBParser<'_> {
     pub fn parse(&mut self) -> Result<RDB, RDBError> {
         let mut rdb = RDB::new();
         self.parse_header(&mut rdb)?;
-        //self.parse_body(&mut rdb)?;
+        self.parse_body(&mut rdb)?;
         Ok(rdb)
     }
 
@@ -81,12 +84,10 @@ impl RDBParser<'_> {
         let mut buf = [0u8; 9];
         self.read(&mut buf)?;
         if &buf[0..5] != b"REDIS" {
-            dbg!("REDIS");
             return Err(RDBError::InvalidMagicNumber);
         }
         let version = &buf[5..];
         if version != b"0003" {
-            dbg!("VERSION");
             return Err(RDBError::InvalidVersion);
         }
         rdb.version = version[1] - b'0';
