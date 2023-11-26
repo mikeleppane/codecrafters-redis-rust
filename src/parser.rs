@@ -85,7 +85,7 @@ impl RDBParser<'_> {
             return Err(RDBError::InvalidMagicNumber);
         }
         let version = &buf[5..];
-        if version != b"0009" && version != b"0006" {
+        if version != b"0003" {
             dbg!("VERSION");
             return Err(RDBError::InvalidVersion);
         }

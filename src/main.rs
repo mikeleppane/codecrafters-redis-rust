@@ -142,6 +142,8 @@ async fn handle_connection<T: Database>(
                         let mut parser = RDBParser::new(&buffer);
                         if let Ok(rdb) = parser.parse() {
                             dbg!(rdb);
+                        } else {
+                            dbg!("error while parsing header");
                         }
 
                         println!("{:#04X?}", buffer);
