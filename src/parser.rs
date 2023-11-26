@@ -81,10 +81,12 @@ impl RDBParser<'_> {
         let mut buf = [0u8; 9];
         self.read(&mut buf)?;
         if &buf[0..5] != b"REDIS" {
+            dbg!("REDIS");
             return Err(RDBError::InvalidMagicNumber);
         }
         let version = &buf[5..];
         if version != b"0009" && version != b"0006" {
+            dbg!("VERSION");
             return Err(RDBError::InvalidVersion);
         }
         rdb.version = version[1] - b'0';
