@@ -137,7 +137,7 @@ async fn handle_connection<T: Database>(
                         let file = File::open(path).unwrap();
                         let mut reader = io::BufReader::new(file);
                         loop {
-                            let mut buffer: [u8; 1] = [0; 1]; // create a buffer
+                            let mut buffer: [u8; 4] = [0; 4]; // create a buffer
                             if reader.read_exact(&mut buffer).is_ok() {
                                 println!("{:#04X?}", buffer);
                             }
