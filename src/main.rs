@@ -129,6 +129,7 @@ async fn handle_connection<T: Database>(
 
             Some(Command::Keys(keys)) => {
                 let config = config.lock().unwrap();
+                dbg!(keys.as_str());
 
                 if keys.as_str() == "*" {
                     if let Some(path) = config.to_file_path() {
