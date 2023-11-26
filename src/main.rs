@@ -142,7 +142,7 @@ async fn handle_connection<T: Database>(
                                 if buffer[0] == 0 {
                                     break;
                                 }
-                                dbg!(buffer);
+                                dbg!(String::from_utf8_lossy(&buffer));
                             }
                         }
                     }
