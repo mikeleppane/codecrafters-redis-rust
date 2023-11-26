@@ -138,7 +138,7 @@ async fn handle_connection<T: Database>(
                         let mut reader = io::BufReader::new(file);
                         let mut byte_vec: Vec<u8> = Vec::new();
                         reader.read_to_end(&mut byte_vec).unwrap();
-                        dbg!(String::from_utf8(byte_vec).unwrap());
+                        dbg!(String::from_utf8_lossy(&byte_vec));
                     }
                 }
             }
