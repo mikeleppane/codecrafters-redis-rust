@@ -11,12 +11,13 @@ use std::{
 mod command;
 mod config;
 mod db;
+mod parser;
 mod response;
+use crate::config::Config;
 use command::{Command, SetCommand};
 use db::{Database, GetValue, RedisDatabase};
+use parser::RDBParser;
 use response::{RespParser, Value};
-
-use crate::config::Config;
 
 #[derive(Parser, Debug)]
 #[clap(
@@ -138,6 +139,11 @@ async fn handle_connection<T: Database>(
                         let mut reader = io::BufReader::new(file);
                         let mut buffer = Vec::new();
                         reader.read_to_end(&mut buffer).unwrap();
+                        let mut parser = RDBParser::new(&buffer);
+                        if let Ok(rdb) = parser.parse() {
+                            dbg!(rdb);
+                        }
+
                         println!("{:#04X?}", buffer);
                     }
                 }
