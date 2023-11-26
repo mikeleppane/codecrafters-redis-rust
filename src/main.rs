@@ -1,7 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
 use std::{
-    io::{Read, Write},
+    fs::File,
+    io::{self, Read, Write},
     net::{TcpListener, TcpStream},
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -93,7 +94,7 @@ async fn handle_connection<T: Database>(
                 let SetCommand { key, value, px } = set_command;
                 let mut db = db.lock().unwrap();
 
-                db.set(key, value, px);
+                db.set(&key, &value, px);
                 stream.write_all(encode_response(b"OK").as_slice()).unwrap();
             }
 
@@ -123,6 +124,20 @@ async fn handle_connection<T: Database>(
                         .unwrap();
                 } else {
                     stream.write_all(b"$-1\r\n").unwrap();
+                }
+            }
+
+            Some(Command::Keys(keys)) => {
+                let config = config.lock().unwrap();
+
+                if keys.as_str() == "*" {
+                    if let Some(path) = config.to_file_path() {
+                        let file = File::open(path)?;
+                        let mut reader = io::BufReader::new(file);
+                        let mut buffer: [u8; 512] = [0; 512]; // create a buffer
+                        reader.read_exact(&mut buffer)?;
+                        dbg!(std::str::from_utf8(&buffer)?.to_string());
+                    }
                 }
             }
 

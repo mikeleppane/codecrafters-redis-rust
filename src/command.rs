@@ -18,6 +18,7 @@ pub enum Command {
     Set(SetCommand),
     Get(String),
     Config(String),
+    Keys(String),
 }
 
 impl Command {
@@ -27,10 +28,10 @@ impl Command {
             "ECHO" => Some(Command::Echo(
                 args.iter()
                     .map(|arg| match arg {
-                        Value::String(string) => string.clone(),
-                        _ => "".to_string(),
+                        Value::String(string) => string,
+                        _ => "",
                     })
-                    .collect::<Vec<String>>()
+                    .collect::<Vec<&str>>()
                     .join(" "),
             )),
             "SET" => {
@@ -47,8 +48,8 @@ impl Command {
                     match (&args[0], &args[1]) {
                         (Value::String(key), Value::String(value)) => {
                             return Some(Command::Set(SetCommand::new(
-                                key.clone(),
-                                value.clone(),
+                                key.to_string(),
+                                value.to_string(),
                                 None,
                             )))
                         }
@@ -80,8 +81,8 @@ impl Command {
                                 }
                             };
                             return Some(Command::Set(SetCommand::new(
-                                key.clone(),
-                                value.clone(),
+                                key.to_string(),
+                                value.to_string(),
                                 Some(px),
                             )));
                         }
@@ -120,6 +121,20 @@ impl Command {
                     None
                 }
             },
+
+            "KEYS" => {
+                if args.len() != 1 {
+                    eprintln!("wrong number of arguments for 'keys' command");
+                    return None;
+                }
+                match &args[0] {
+                    Value::String(key) => Some(Command::Keys(key.clone())),
+                    _ => {
+                        eprintln!("wrong type of arguments for 'get' command");
+                        None
+                    }
+                }
+            }
 
             _ => {
                 eprintln!("unknown command '{}'", name);

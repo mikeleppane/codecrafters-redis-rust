@@ -4,15 +4,15 @@ use std::{
 };
 
 #[derive(Debug)]
-pub enum GetValue {
-    Ok(String),
+pub enum GetValue<'a> {
+    Ok(&'a str),
     None,
-    Error(String),
+    Error(&'a str),
 }
 
 pub trait Database {
     fn get(&self, key: &str) -> GetValue;
-    fn set(&mut self, key: String, value: String, expires_at: Option<u64>);
+    fn set(&mut self, key: &str, value: &str, expires_at: Option<u64>);
     fn delete(&mut self, key: &str) -> Option<String>;
 }
 
@@ -42,14 +42,18 @@ impl RedisDatabase {
 }
 
 impl Database for RedisDatabase {
-    fn set(&mut self, key: String, value: String, expires_at: Option<u64>) {
+    fn set(&mut self, key: &str, value: &str, expires_at: Option<u64>) {
         if let Some(expires_at) = expires_at {
             let now = SystemTime::now();
             let expiry_duration = Duration::from_millis(expires_at);
             let expires_at = now + expiry_duration;
-            self.data.insert(key, DbValue::new(value, Some(expires_at)));
+            self.data.insert(
+                key.to_owned(),
+                DbValue::new(value.to_owned(), Some(expires_at)),
+            );
         } else {
-            self.data.insert(key, DbValue::new(value, None));
+            self.data
+                .insert(key.to_owned(), DbValue::new(value.to_owned(), None));
         }
     }
 
@@ -60,15 +64,15 @@ impl Database for RedisDatabase {
                 expires_at: Some(expires_at),
             }) => {
                 if expires_at <= &SystemTime::now() {
-                    GetValue::Error(value.clone())
+                    GetValue::Error(value)
                 } else {
-                    GetValue::Ok(value.clone())
+                    GetValue::Ok(value)
                 }
             }
             Some(DbValue {
                 value,
                 expires_at: None,
-            }) => GetValue::Ok(value.clone()),
+            }) => GetValue::Ok(value),
             None => GetValue::None,
         }
     }
