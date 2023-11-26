@@ -136,12 +136,9 @@ async fn handle_connection<T: Database>(
                         dbg!(&path);
                         let file = File::open(path).unwrap();
                         let mut reader = io::BufReader::new(file);
-                        loop {
-                            let mut buffer: [u8; 4] = [0; 4]; // create a buffer
-                            if reader.read_exact(&mut buffer).is_ok() {
-                                println!("{:#04X?}", buffer);
-                            }
-                        }
+                        let mut buffer = Vec::new();
+                        reader.read_to_end(&mut buffer).unwrap();
+                        println!("{:#04X?}", buffer);
                     }
                 }
             }
