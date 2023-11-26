@@ -136,7 +136,7 @@ async fn handle_connection<T: Database>(
                         dbg!(&path);
                         let file = File::open(path).unwrap();
                         let mut reader = io::BufReader::new(file);
-                        let mut buffer: [u8; 4096] = [0; 4096]; // create a buffer
+                        let mut buffer: [u8; 32] = [0; 32]; // create a buffer
                         reader.read_exact(&mut buffer).unwrap();
                         dbg!(std::str::from_utf8(&buffer)?.to_string());
                     }
