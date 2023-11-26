@@ -2,7 +2,6 @@ use anyhow::Result;
 use clap::Parser;
 use std::{
     fs::File,
-    hash::BuildHasher,
     io::{self, Read, Write},
     net::{TcpListener, TcpStream},
     path::PathBuf,
@@ -140,9 +139,6 @@ async fn handle_connection<T: Database>(
                         loop {
                             let mut buffer: [u8; 1] = [0; 1]; // create a buffer
                             if reader.read_exact(&mut buffer).is_ok() {
-                                if buffer[0] == 0 {
-                                    break;
-                                }
                                 println!("{:#04X?}", buffer);
                             }
                         }
