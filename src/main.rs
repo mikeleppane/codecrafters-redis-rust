@@ -73,7 +73,6 @@ fn process_request(request: &[u8]) -> Option<Command> {
 }
 
 fn read_rdb_file(path: PathBuf) -> Result<Rdb> {
-    let path = Path::new(&path);
     let file = File::open(path).expect("Unable to open file");
     let mut reader = io::BufReader::new(file);
     let mut buffer = Vec::new();
@@ -88,16 +87,6 @@ async fn handle_connection<T: Database>(
     db: Arc<Mutex<T>>,
     config: Arc<Mutex<Config>>,
 ) -> Result<()> {
-    let mut rdb = Rdb::new();
-    if let Some(path) = config.lock().unwrap().to_file_path() {
-        println!("Reading rdb file from {:?}", path);
-        match read_rdb_file(path) {
-            Ok(new_rdb) => rdb = new_rdb,
-            Err(e) => {
-                panic!("Unable to read and parse rdb: {}", e)
-            }
-        }
-    }
     while let Some(request) = read_from_stream(&mut stream) {
         if request.is_empty() {
             break;
@@ -137,7 +126,7 @@ async fn handle_connection<T: Database>(
                         stream.write_all(encode_response(value.as_bytes()).as_slice())?
                     }
                     GetValue::None => {
-                        let value = rdb.get(&key);
+                        /* let value = rdb.get(&key);
                         match value {
                             Some(value) => {
                                 if value.expiry.is_some() {
@@ -164,7 +153,7 @@ async fn handle_connection<T: Database>(
                             None => {
                                 stream.write_all(b"$-1\r\n").unwrap();
                             }
-                        }
+                        } */
                     }
                 }
             }
@@ -180,6 +169,16 @@ async fn handle_connection<T: Database>(
 
             Some(Command::Keys(keys)) => {
                 if keys.as_str() == "*" {
+                    let mut rdb = Rdb::new();
+                    if let Some(path) = config.lock().unwrap().to_file_path() {
+                        println!("Reading rdb file from {:?}", path);
+                        match read_rdb_file(path) {
+                            Ok(new_rdb) => rdb = new_rdb,
+                            Err(e) => {
+                                panic!("Unable to read and parse rdb: {}", e)
+                            }
+                        }
+                    }
                     stream.write_all(to_list_of_bulk_strings(&rdb.get_keys()).as_bytes())?
                 }
             }
@@ -200,14 +199,7 @@ async fn main() -> Result<()> {
 
     let db = Arc::new(Mutex::new(RedisDatabase::new()));
     let config = Arc::new(Mutex::new(Config::new(args.dir, args.dbfilename)));
-    sleep(Duration::from_millis(1000)).await;
-    let path = config.lock().unwrap().to_file_path();
-    if path.is_some() {
-        match metadata(path.unwrap()).await {
-            Ok(_) => println!("File exists!"),
-            Err(_) => println!("File does not exist!"),
-        }
-    }
+
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
