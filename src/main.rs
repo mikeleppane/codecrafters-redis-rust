@@ -71,6 +71,7 @@ fn process_request(request: &[u8]) -> Option<Command> {
 }
 
 fn read_rdb_file(path: PathBuf) -> Result<Rdb> {
+    let path = Path::new(&path);
     let file = File::open(path).expect("Unable to open file");
     let mut reader = io::BufReader::new(file);
     let mut buffer = Vec::new();
