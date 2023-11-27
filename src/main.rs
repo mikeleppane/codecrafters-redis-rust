@@ -7,6 +7,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
+use tokio::fs::metadata;
 
 mod command;
 mod config;
@@ -200,7 +201,7 @@ async fn main() -> Result<()> {
     let config = Arc::new(Mutex::new(Config::new(args.dir, args.dbfilename)));
     let path = config.lock().unwrap().to_file_path();
     if path.is_some() {
-        match fs::metadata(path.as_ref().unwrap()) {
+        match metadata(path.as_ref().unwrap()).await {
             Ok(_) => println!("File exists!"),
             Err(_) => println!("File does not exist!"),
         }
