@@ -17,7 +17,7 @@ mod response;
 use crate::config::Config;
 use command::{Command, SetCommand};
 use db::{Database, GetValue, RedisDatabase};
-use encoding::to_list_of_bulk_strings;
+use encoding::{to_bulk_string, to_list_of_bulk_strings};
 use parser::RDBParser;
 use response::{RespParser, Value};
 
@@ -125,11 +125,9 @@ async fn handle_connection<T: Database>(
                             let mut parser = RDBParser::new(&buffer);
                             match parser.parse() {
                                 Ok(rdb) => {
-                                    stream
-                                        .write_all(
-                                            to_list_of_bulk_strings(&rdb.get_keys()).as_bytes(),
-                                        )
-                                        .unwrap();
+                                    for key in &rdb.get_keys() {
+                                        stream.write_all(to_bulk_string(key).as_bytes()).unwrap();
+                                    }
                                 }
                                 Err(e) => {
                                     eprintln!("unable to parse rdb: {}", e)
