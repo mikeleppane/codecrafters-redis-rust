@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use std::{
-    fs::File,
+    fs::{self, File},
     io::{self, Read, Write},
     net::{TcpListener, TcpStream},
     path::{Path, PathBuf},
@@ -197,7 +197,10 @@ async fn main() -> Result<()> {
 
     let db = Arc::new(Mutex::new(RedisDatabase::new()));
     let config = Arc::new(Mutex::new(Config::new(args.dir, args.dbfilename)));
-
+    match fs::metadata(config.lock().unwrap().to_file_path().as_ref().unwrap()) {
+        Ok(_) => println!("File exists!"),
+        Err(_) => println!("File does not exist!"),
+    }
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
