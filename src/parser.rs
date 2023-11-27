@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    time::{Duration, SystemTime},
-};
+use std::collections::HashMap;
 
 use crate::response::Value;
 use thiserror::Error;
@@ -76,10 +73,6 @@ impl Rdb {
 
     pub fn get_keys(&self) -> Vec<String> {
         self.data.keys().cloned().collect()
-    }
-
-    pub fn get_values(&self) -> Vec<String> {
-        self.data.values().map(|v| v.value.to_string()).collect()
     }
 
     pub fn get(&self, key: &str) -> Option<&RdbValue> {
@@ -218,15 +211,6 @@ impl RDBParser<'_> {
         }
     }
 
-    #[allow(dead_code)]
-    fn read_expiry(&mut self) -> Result<(u32, u64), RDBError> {
-        let db = self.read_length()?;
-        let mut buf = [0u8; 8];
-        self.read(&mut buf)?;
-        let expires = u64::from_le_bytes(buf);
-        Ok((db, expires))
-    }
-
     fn read_string(&mut self) -> Result<String, RDBError> {
         let length = self.read_length()?;
         let mut buf = vec![0u8; length as usize];
@@ -238,17 +222,7 @@ impl RDBParser<'_> {
     fn read_object(&mut self, object_type: u8) -> Result<Value, RDBError> {
         match object_type {
             0 => Ok(Value::String(self.read_string()?)),
-            _ => Err(RDBError::InvalidType), /* 1 => Ok(Value::List(self.read_list()?)),
-                                             2 => Ok(Value::Set(self.read_set()?)),
-                                             3 => Ok(Value::SortedSet(self.read_sorted_set()?)),
-                                             4 => Ok(Value::Hash(self.read_hash()?)),
-                                             9 => Ok(Value::ZipList(self.read_zip_list()?)),
-                                             10 => Ok(Value::IntSet(self.read_int_set()?)),
-                                             11 => Ok(Value::SortedSetAsZipList(
-                                                 self.read_sorted_set_as_zip_list()?,
-                                             )),
-                                             12 => Ok(Value::HashmapAsZipList(self.read_hashmap_as_zip_list()?)),
-                                             _ => Err(RDBError::InvalidType), */
+            _ => Err(RDBError::InvalidType),
         }
     }
 }

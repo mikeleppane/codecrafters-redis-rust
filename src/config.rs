@@ -1,4 +1,3 @@
-use crate::encoding::to_bulk_string;
 use std::path::PathBuf;
 pub struct Config {
     pub dir: Option<PathBuf>,
@@ -23,13 +22,5 @@ impl Config {
             "dbfilename" => self.dbfilename.as_deref(),
             _ => None,
         }
-    }
-
-    pub fn encode_to_resp(&self, key: &str, value: &str) -> Vec<u8> {
-        let mut buffer = Vec::new();
-        buffer.extend_from_slice(b"*2\r\n");
-        buffer.extend_from_slice(to_bulk_string(key).as_bytes());
-        buffer.extend_from_slice(to_bulk_string(value).as_bytes());
-        buffer
     }
 }

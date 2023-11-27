@@ -11,3 +11,11 @@ pub fn to_list_of_bulk_strings(list: &[String]) -> String {
     }
     buffer
 }
+
+pub fn encode_response_as_simple_string(response: &[u8]) -> Vec<u8> {
+    let mut buffer = Vec::new();
+    buffer.extend_from_slice(b"+");
+    buffer.extend_from_slice(response);
+    buffer.extend_from_slice(b"\r\n");
+    buffer
+}

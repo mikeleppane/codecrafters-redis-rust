@@ -18,7 +18,7 @@ mod response;
 use crate::config::Config;
 use command::{Command, SetCommand};
 use db::{Database, GetValue, RedisDatabase};
-use encoding::{to_bulk_string, to_list_of_bulk_strings};
+use encoding::{encode_response_as_simple_string, to_bulk_string, to_list_of_bulk_strings};
 use parser::{RDBParser, Rdb};
 use response::{RespParser, Value};
 
@@ -44,14 +44,6 @@ fn read_from_stream(stream: &mut TcpStream) -> Option<Vec<u8>> {
         Ok(size) => Some(buf[..size].to_vec()),
         Err(_) => None,
     }
-}
-
-fn encode_response(response: &[u8]) -> Vec<u8> {
-    let mut buffer = Vec::new();
-    buffer.extend_from_slice(b"+");
-    buffer.extend_from_slice(response);
-    buffer.extend_from_slice(b"\r\n");
-    buffer
 }
 
 fn parse(data: &[u8]) -> Option<Value> {
@@ -94,13 +86,13 @@ async fn handle_connection<T: Database>(
         match response {
             Some(Command::Ping(response)) => {
                 stream
-                    .write_all(encode_response(response.as_bytes()).as_slice())
+                    .write_all(encode_response_as_simple_string(response.as_bytes()).as_slice())
                     .unwrap();
             }
 
             Some(Command::Echo(response)) => {
                 stream
-                    .write_all(encode_response(response.as_bytes()).as_slice())
+                    .write_all(encode_response_as_simple_string(response.as_bytes()).as_slice())
                     .unwrap();
             }
 
@@ -109,7 +101,7 @@ async fn handle_connection<T: Database>(
                 let mut db = db.lock().unwrap();
 
                 db.set(&key, &value, px);
-                stream.write_all(encode_response(b"OK").as_slice())?;
+                stream.write_all(encode_response_as_simple_string(b"OK").as_slice())?;
             }
 
             Some(Command::Get(key)) => {
@@ -121,9 +113,8 @@ async fn handle_connection<T: Database>(
                         let mut db = db.lock().unwrap();
                         db.delete(&key);
                     }
-                    GetValue::Ok(value) => {
-                        stream.write_all(encode_response(value.as_bytes()).as_slice())?
-                    }
+                    GetValue::Ok(value) => stream
+                        .write_all(encode_response_as_simple_string(value.as_bytes()).as_slice())?,
                     GetValue::None => {
                         let mut rdb = Rdb::new();
                         if let Some(path) = config.lock().unwrap().to_file_path() {
@@ -171,7 +162,13 @@ async fn handle_connection<T: Database>(
             Some(Command::Config(config_key)) => {
                 let config = config.lock().unwrap();
                 if let Some(config_value) = config.get(&config_key) {
-                    stream.write_all(config.encode_to_resp(&config_key, config_value).as_slice())?
+                    stream.write_all(
+                        to_list_of_bulk_strings(&[
+                            config_key.to_string(),
+                            config_value.to_string(),
+                        ])
+                        .as_bytes(),
+                    )?
                 } else {
                     stream.write_all(b"$-1\r\n").unwrap();
                 }
