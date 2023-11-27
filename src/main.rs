@@ -84,16 +84,8 @@ async fn handle_connection<T: Database>(
     mut stream: TcpStream,
     db: Arc<Mutex<T>>,
     config: Arc<Mutex<Config>>,
+    rdb: Arc<Mutex<Rdb>>,
 ) -> Result<()> {
-    let mut rdb = Rdb::new();
-    if let Some(path) = config.lock().unwrap().to_file_path() {
-        match read_rdb_file(path) {
-            Ok(new_rdb) => rdb = new_rdb,
-            Err(e) => {
-                eprintln!("Unable to read and parse rdb: {}", e)
-            }
-        }
-    }
     while let Some(request) = read_from_stream(&mut stream) {
         if request.is_empty() {
             break;
@@ -133,10 +125,30 @@ async fn handle_connection<T: Database>(
                         stream.write_all(encode_response(value.as_bytes()).as_slice())?
                     }
                     GetValue::None => {
+                        let mut rdb = rdb.lock().unwrap();
                         let value = rdb.get(&key);
                         match value {
                             Some(value) => {
-                                stream.write_all(to_bulk_string(&value).as_bytes()).unwrap();
+                                if value.expiry.is_some() {
+                                    let now = std::time::SystemTime::now();
+                                    if value.expiry.unwrap() <= now {
+                                        stream.write_all(b"$-1\r\n").unwrap();
+                                        rdb.delete(&key);
+                                        continue;
+                                    } else {
+                                        stream
+                                            .write_all(
+                                                to_bulk_string(&value.value.to_string()).as_bytes(),
+                                            )
+                                            .unwrap();
+                                    }
+                                } else {
+                                    stream
+                                        .write_all(
+                                            to_bulk_string(&value.value.to_string()).as_bytes(),
+                                        )
+                                        .unwrap();
+                                }
                             }
                             None => {
                                 stream.write_all(b"$-1\r\n").unwrap();
@@ -157,6 +169,7 @@ async fn handle_connection<T: Database>(
 
             Some(Command::Keys(keys)) => {
                 if keys.as_str() == "*" {
+                    let rdb = rdb.lock().unwrap();
                     stream.write_all(to_list_of_bulk_strings(&rdb.get_keys()).as_bytes())?
                 }
             }
@@ -177,14 +190,25 @@ async fn main() -> Result<()> {
 
     let db = Arc::new(Mutex::new(RedisDatabase::new()));
     let config = Arc::new(Mutex::new(Config::new(args.dir, args.dbfilename)));
+    let mut rdb = Rdb::new();
+    if let Some(path) = config.lock().unwrap().to_file_path() {
+        match read_rdb_file(path) {
+            Ok(new_rdb) => rdb = new_rdb,
+            Err(e) => {
+                panic!("Unable to read and parse rdb: {}", e)
+            }
+        }
+    }
+    let rdb = Arc::new(Mutex::new(rdb));
 
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 let db = Arc::clone(&db);
                 let config = Arc::clone(&config);
+                let rdb = Arc::clone(&rdb);
                 tokio::task::spawn(async move {
-                    match handle_connection(stream, db, config).await {
+                    match handle_connection(stream, db, config, rdb).await {
                         Ok(_) => {}
                         Err(e) => {
                             eprintln!("Failure while handling connection: {}", e);

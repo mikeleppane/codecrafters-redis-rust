@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    time::{Duration, SystemTime},
+};
 
 use crate::response::Value;
 use thiserror::Error;
@@ -22,7 +25,7 @@ pub enum RDBError {
 #[derive(Debug)]
 pub struct RdbValue {
     pub value: Value,
-    pub expiry: Option<u64>,
+    pub expiry: Option<SystemTime>,
 }
 
 #[derive(Debug)]
@@ -52,7 +55,26 @@ impl Rdb {
     }
 
     pub fn add_object(&mut self, key: String, value: Value, expiry: Option<u64>) {
-        self.data.insert(key, RdbValue { value, expiry });
+        if let Some(expiry) = expiry {
+            let now = SystemTime::now();
+            let expiry_duration = Duration::from_millis(expiry);
+            let expires_at = now + expiry_duration;
+            self.data.insert(
+                key,
+                RdbValue {
+                    value,
+                    expiry: Some(expires_at),
+                },
+            );
+        } else {
+            self.data.insert(
+                key,
+                RdbValue {
+                    value,
+                    expiry: None,
+                },
+            );
+        }
     }
 
     pub fn get_keys(&self) -> Vec<String> {
@@ -63,8 +85,12 @@ impl Rdb {
         self.data.values().map(|v| v.value.to_string()).collect()
     }
 
-    pub fn get(&self, key: &str) -> Option<String> {
-        self.data.get(key).map(|v| v.value.to_string())
+    pub fn get(&self, key: &str) -> Option<&RdbValue> {
+        self.data.get(key)
+    }
+
+    pub fn delete(&mut self, key: &str) -> Option<RdbValue> {
+        self.data.remove(key)
     }
 }
 
