@@ -84,8 +84,17 @@ async fn handle_connection<T: Database>(
     mut stream: TcpStream,
     db: Arc<Mutex<T>>,
     config: Arc<Mutex<Config>>,
-    rdb: Arc<Mutex<Rdb>>,
 ) -> Result<()> {
+    let mut rdb = Rdb::new();
+    if let Some(path) = config.lock().unwrap().to_file_path() {
+        println!("Reading rdb file from {:?}", path);
+        match read_rdb_file(path) {
+            Ok(new_rdb) => rdb = new_rdb,
+            Err(e) => {
+                panic!("Unable to read and parse rdb: {}", e)
+            }
+        }
+    }
     while let Some(request) = read_from_stream(&mut stream) {
         if request.is_empty() {
             break;
@@ -125,7 +134,6 @@ async fn handle_connection<T: Database>(
                         stream.write_all(encode_response(value.as_bytes()).as_slice())?
                     }
                     GetValue::None => {
-                        let mut rdb = rdb.lock().unwrap();
                         let value = rdb.get(&key);
                         match value {
                             Some(value) => {
@@ -169,7 +177,6 @@ async fn handle_connection<T: Database>(
 
             Some(Command::Keys(keys)) => {
                 if keys.as_str() == "*" {
-                    let rdb = rdb.lock().unwrap();
                     stream.write_all(to_list_of_bulk_strings(&rdb.get_keys()).as_bytes())?
                 }
             }
@@ -189,28 +196,15 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     let db = Arc::new(Mutex::new(RedisDatabase::new()));
-    let config = Config::new(args.dir, args.dbfilename);
-    let mut rdb = Rdb::new();
-    if let Some(path) = config.to_file_path() {
-        println!("Reading rdb file from {:?}", path);
-        match read_rdb_file(path) {
-            Ok(new_rdb) => rdb = new_rdb,
-            Err(e) => {
-                panic!("Unable to read and parse rdb: {}", e)
-            }
-        }
-    }
-    let rdb = Arc::new(Mutex::new(rdb));
-    let config = Arc::new(Mutex::new(config));
+    let config = Arc::new(Mutex::new(Config::new(args.dir, args.dbfilename)));
 
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 let db = Arc::clone(&db);
                 let config = Arc::clone(&config);
-                let rdb = Arc::clone(&rdb);
                 tokio::task::spawn(async move {
-                    match handle_connection(stream, db, config, rdb).await {
+                    match handle_connection(stream, db, config).await {
                         Ok(_) => {}
                         Err(e) => {
                             eprintln!("Failure while handling connection: {}", e);
