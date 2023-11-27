@@ -130,7 +130,7 @@ async fn handle_connection<T: Database>(
                                     }
                                 }
                                 Err(e) => {
-                                    eprintln!("unable to parse rdb: {}", e)
+                                    eprintln!("Unable to parse rdb: {}", e)
                                 }
                             }
                         }
