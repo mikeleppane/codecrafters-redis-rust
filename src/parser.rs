@@ -17,17 +17,21 @@ pub enum RDBError {
 }
 
 #[derive(Debug)]
-pub struct RDB {
+pub struct Rdb {
     version: u8,
+    #[allow(dead_code)]
     db: u32,
+    #[allow(dead_code)]
     expiry: u64,
+    #[allow(dead_code)]
     checksum: u64,
+    #[allow(dead_code)]
     data: Vec<(String, Value)>,
 }
 
-impl RDB {
-    pub fn new() -> RDB {
-        RDB {
+impl Rdb {
+    pub fn new() -> Rdb {
+        Rdb {
             version: 0,
             db: 0,
             expiry: 0,
@@ -36,14 +40,17 @@ impl RDB {
         }
     }
 
+    #[allow(dead_code)]
     pub fn select_db(&mut self, db: u32) {
         self.db = db;
     }
 
+    #[allow(dead_code)]
     pub fn current_db(&self) -> u32 {
         self.db
     }
 
+    #[allow(dead_code)]
     pub fn set_expiry(&mut self, expiry: u64) {
         self.expiry = expiry;
     }
@@ -73,14 +80,14 @@ impl RDBParser<'_> {
         RDBParser { buf, pos: 0 }
     }
 
-    pub fn parse(&mut self) -> Result<RDB, RDBError> {
-        let mut rdb = RDB::new();
+    pub fn parse(&mut self) -> Result<Rdb, RDBError> {
+        let mut rdb = Rdb::new();
         self.parse_header(&mut rdb)?;
         self.parse_body(&mut rdb)?;
         Ok(rdb)
     }
 
-    fn parse_header(&mut self, rdb: &mut RDB) -> Result<(), RDBError> {
+    fn parse_header(&mut self, rdb: &mut Rdb) -> Result<(), RDBError> {
         let mut buf = [0u8; 9];
         self.read(&mut buf)?;
         if &buf[0..5] != b"REDIS" {
@@ -94,7 +101,7 @@ impl RDBParser<'_> {
         Ok(())
     }
 
-    fn parse_body(&mut self, rdb: &mut RDB) -> Result<(), RDBError> {
+    fn parse_body(&mut self, rdb: &mut Rdb) -> Result<(), RDBError> {
         loop {
             let byte = self.read_byte()?;
             if byte == 0xFF {
@@ -109,11 +116,36 @@ impl RDBParser<'_> {
                 }
                 continue;
             }
+
+            if byte == 0xFE {
+                let _ = self.read_byte();
+                continue;
+            }
+
+            if byte == 0xFB {
+                let mut buf = [0u8; 2];
+                self.read(&mut buf)?;
+                continue;
+            }
+
+            if byte == 0xFD {
+                continue;
+            }
+
+            if byte == 0xFC {
+                continue;
+            }
+            let key = self.read_string()?;
+            let value = self.read_object(byte)?;
+
+            println!("key: {}, value: {:?}", key, value);
+
             println!("{:#04X?}", byte);
         }
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn read_until(&mut self, byte: u8) -> Result<Vec<u8>, RDBError> {
         let mut buf = Vec::new();
         loop {
