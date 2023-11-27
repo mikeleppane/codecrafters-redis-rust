@@ -134,7 +134,6 @@ async fn handle_connection<T: Database>(
 
                 if keys.as_str() == "*" {
                     if let Some(path) = config.to_file_path() {
-                        dbg!(&path);
                         let file = File::open(path).unwrap();
                         let mut reader = io::BufReader::new(file);
                         let mut buffer = Vec::new();

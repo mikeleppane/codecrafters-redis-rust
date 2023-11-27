@@ -107,16 +107,13 @@ impl RDBParser<'_> {
                             break;
                         }
                     }
-                    continue;
                 }
                 0xFE => {
                     let _ = self.read_length()?;
-                    continue;
                 }
 
                 0xFB => {
                     let _ = self.read_length()?;
-                    continue;
                 }
 
                 0xFD => {
@@ -131,7 +128,7 @@ impl RDBParser<'_> {
                 }
 
                 _ => {
-                    dbg!(byte);
+                    println!("{:#04X?}", byte);
                     let db = rdb.current_db();
                     let expires = rdb.current_expiry();
                     let key = self.read_string()?;
