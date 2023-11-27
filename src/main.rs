@@ -201,7 +201,8 @@ async fn main() -> Result<()> {
     let config = Arc::new(Mutex::new(Config::new(args.dir, args.dbfilename)));
     let path = config.lock().unwrap().to_file_path();
     if path.is_some() {
-        match metadata(path.as_ref().unwrap()).await {
+        let path: String = path.unwrap().to_str().unwrap().trim().to_string();
+        match metadata(path).await {
             Ok(_) => println!("File exists!"),
             Err(_) => println!("File does not exist!"),
         }
