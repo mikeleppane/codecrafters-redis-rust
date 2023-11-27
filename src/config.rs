@@ -1,5 +1,5 @@
 use crate::encoding::to_bulk_string;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 pub struct Config {
     pub dir: Option<PathBuf>,
     pub dbfilename: Option<String>,

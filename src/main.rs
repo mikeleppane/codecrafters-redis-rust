@@ -1,14 +1,12 @@
 use anyhow::Result;
 use clap::Parser;
 use std::{
-    fs::{self, File},
+    fs::File,
     io::{self, Read, Write},
     net::{TcpListener, TcpStream},
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, Mutex},
-    time::Duration,
 };
-use tokio::{fs::metadata, time::sleep};
 
 mod command;
 mod config;
@@ -126,7 +124,16 @@ async fn handle_connection<T: Database>(
                         stream.write_all(encode_response(value.as_bytes()).as_slice())?
                     }
                     GetValue::None => {
-                        /* let value = rdb.get(&key);
+                        let mut rdb = Rdb::new();
+                        if let Some(path) = config.lock().unwrap().to_file_path() {
+                            match read_rdb_file(path) {
+                                Ok(new_rdb) => rdb = new_rdb,
+                                Err(e) => {
+                                    panic!("Unable to read and parse rdb: {}", e)
+                                }
+                            }
+                        }
+                        let value = rdb.get(&key);
                         match value {
                             Some(value) => {
                                 if value.expiry.is_some() {
@@ -153,7 +160,7 @@ async fn handle_connection<T: Database>(
                             None => {
                                 stream.write_all(b"$-1\r\n").unwrap();
                             }
-                        } */
+                        }
                     }
                 }
             }
@@ -171,7 +178,6 @@ async fn handle_connection<T: Database>(
                 if keys.as_str() == "*" {
                     let mut rdb = Rdb::new();
                     if let Some(path) = config.lock().unwrap().to_file_path() {
-                        println!("Reading rdb file from {:?}", path);
                         match read_rdb_file(path) {
                             Ok(new_rdb) => rdb = new_rdb,
                             Err(e) => {
