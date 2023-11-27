@@ -20,10 +20,16 @@ pub enum RDBError {
 }
 
 #[derive(Debug)]
+pub struct RdbValue {
+    pub value: Value,
+    pub expiry: Option<u64>,
+}
+
+#[derive(Debug)]
 pub struct Rdb {
     version: u8,
     db: u32,
-    data: HashMap<String, Value>,
+    data: HashMap<String, RdbValue>,
 }
 
 impl Rdb {
@@ -45,8 +51,8 @@ impl Rdb {
         self.db
     }
 
-    pub fn add_object(&mut self, key: String, value: Value) {
-        self.data.insert(key, value);
+    pub fn add_object(&mut self, key: String, value: Value, expiry: Option<u64>) {
+        self.data.insert(key, RdbValue { value, expiry });
     }
 
     pub fn get_keys(&self) -> Vec<String> {
@@ -54,11 +60,11 @@ impl Rdb {
     }
 
     pub fn get_values(&self) -> Vec<String> {
-        self.data.values().map(|v| v.to_string()).collect()
+        self.data.values().map(|v| v.value.to_string()).collect()
     }
 
     pub fn get(&self, key: &str) -> Option<String> {
-        self.data.get(key).map(|v| v.to_string())
+        self.data.get(key).map(|v| v.value.to_string())
     }
 }
 
@@ -122,17 +128,27 @@ impl RDBParser<'_> {
             }
 
             if byte == 0xFD {
+                let mut buf = [0u8; 4];
+                self.read(&mut buf)?;
+                let expiry_in_ms = (u32::from_le_bytes(buf) * 1000) as u64;
+                let key = self.read_string()?;
+                let value = self.read_object(byte)?;
+                rdb.add_object(key, value, Some(expiry_in_ms));
                 continue;
             }
 
             if byte == 0xFC {
+                let mut buf = [0u8; 8];
+                self.read(&mut buf)?;
+                let expiry_in_ms = u64::from_le_bytes(buf);
+                let key = self.read_string()?;
+                let value = self.read_object(byte)?;
+                rdb.add_object(key, value, Some(expiry_in_ms));
                 continue;
             }
-            println!("{:#04X?}", byte);
             let key = self.read_string()?;
             let value = self.read_object(byte)?;
-            println!("key: {}, value: {:?}", key, value);
-            rdb.add_object(key, value);
+            rdb.add_object(key, value, None);
         }
         Ok(())
     }
