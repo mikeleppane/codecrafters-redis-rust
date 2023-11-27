@@ -120,8 +120,10 @@ impl RDBParser<'_> {
             if byte == 0xFC {
                 continue;
             }
+            println!("{:#04X?}", byte);
             let key = self.read_string()?;
             let value = self.read_object(byte)?;
+            println!("key: {}, value: {:?}", key, value);
             rdb.add_object(key, value);
         }
         Ok(())
