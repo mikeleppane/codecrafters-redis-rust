@@ -153,6 +153,7 @@ impl RDBParser<'_> {
                 continue;
             }
 
+            println!("{:#04X?}", byte);
             if byte == 0xFD {
                 let mut buf = [0u8; 4];
                 self.read(&mut buf)?;
