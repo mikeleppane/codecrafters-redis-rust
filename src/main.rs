@@ -189,9 +189,9 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     let db = Arc::new(Mutex::new(RedisDatabase::new()));
-    let config = Arc::new(Mutex::new(Config::new(args.dir, args.dbfilename)));
+    let config = Config::new(args.dir, args.dbfilename);
     let mut rdb = Rdb::new();
-    if let Some(path) = config.lock().unwrap().to_file_path() {
+    if let Some(path) = config.to_file_path() {
         match read_rdb_file(path) {
             Ok(new_rdb) => rdb = new_rdb,
             Err(e) => {
@@ -200,6 +200,7 @@ async fn main() -> Result<()> {
         }
     }
     let rdb = Arc::new(Mutex::new(rdb));
+    let config = Arc::new(Mutex::new(config));
 
     for stream in listener.incoming() {
         match stream {
