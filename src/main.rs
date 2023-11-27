@@ -197,9 +197,12 @@ async fn main() -> Result<()> {
 
     let db = Arc::new(Mutex::new(RedisDatabase::new()));
     let config = Arc::new(Mutex::new(Config::new(args.dir, args.dbfilename)));
-    match fs::metadata(config.lock().unwrap().to_file_path().as_ref().unwrap()) {
-        Ok(_) => println!("File exists!"),
-        Err(_) => println!("File does not exist!"),
+    let path = config.lock().unwrap().to_file_path();
+    if path.is_some() {
+        match fs::metadata(path.as_ref().unwrap()) {
+            Ok(_) => println!("File exists!"),
+            Err(_) => println!("File does not exist!"),
+        }
     }
     for stream in listener.incoming() {
         match stream {
