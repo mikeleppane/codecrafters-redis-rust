@@ -192,6 +192,7 @@ async fn main() -> Result<()> {
     let config = Config::new(args.dir, args.dbfilename);
     let mut rdb = Rdb::new();
     if let Some(path) = config.to_file_path() {
+        println!("Reading rdb file from {:?}", path);
         match read_rdb_file(path) {
             Ok(new_rdb) => rdb = new_rdb,
             Err(e) => {
