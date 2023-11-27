@@ -56,6 +56,10 @@ impl Rdb {
     pub fn get_values(&self) -> Vec<String> {
         self.data.values().map(|v| v.to_string()).collect()
     }
+
+    pub fn get(&self, key: &str) -> Option<String> {
+        self.data.get(key).map(|v| v.to_string())
+    }
 }
 
 pub struct RDBParser<'a> {

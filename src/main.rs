@@ -4,7 +4,7 @@ use std::{
     fs::File,
     io::{self, Read, Write},
     net::{TcpListener, TcpStream},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -18,7 +18,7 @@ use crate::config::Config;
 use command::{Command, SetCommand};
 use db::{Database, GetValue, RedisDatabase};
 use encoding::{to_bulk_string, to_list_of_bulk_strings};
-use parser::RDBParser;
+use parser::{RDBParser, Rdb};
 use response::{RespParser, Value};
 
 #[derive(Parser, Debug)]
@@ -70,11 +70,30 @@ fn process_request(request: &[u8]) -> Option<Command> {
     }
 }
 
+fn read_rdb_file<T: AsRef<Path>>(path: T) -> Result<Rdb> {
+    let file = File::open(path)?;
+    let mut reader = io::BufReader::new(file);
+    let mut buffer = Vec::new();
+    reader.read_to_end(&mut buffer)?;
+    let mut parser = RDBParser::new(&buffer);
+    let rdb = parser.parse()?;
+    Ok(rdb)
+}
+
 async fn handle_connection<T: Database>(
     mut stream: TcpStream,
     db: Arc<Mutex<T>>,
     config: Arc<Mutex<Config>>,
 ) -> Result<()> {
+    let mut rdb = Rdb::new();
+    if let Some(path) = config.lock().unwrap().to_file_path() {
+        match read_rdb_file(path) {
+            Ok(new_rdb) => rdb = new_rdb,
+            Err(e) => {
+                eprintln!("Unable to read and parse rdb: {}", e)
+            }
+        }
+    }
     while let Some(request) = read_from_stream(&mut stream) {
         if request.is_empty() {
             break;
@@ -98,7 +117,7 @@ async fn handle_connection<T: Database>(
                 let mut db = db.lock().unwrap();
 
                 db.set(&key, &value, px);
-                stream.write_all(encode_response(b"OK").as_slice()).unwrap();
+                stream.write_all(encode_response(b"OK").as_slice())?;
             }
 
             Some(Command::Get(key)) => {
@@ -111,27 +130,16 @@ async fn handle_connection<T: Database>(
                         db.delete(&key);
                     }
                     GetValue::Ok(value) => {
-                        stream
-                            .write_all(encode_response(value.as_bytes()).as_slice())
-                            .unwrap();
+                        stream.write_all(encode_response(value.as_bytes()).as_slice())?
                     }
                     GetValue::None => {
-                        let config = config.lock().unwrap();
-                        if let Some(path) = config.to_file_path() {
-                            let file = File::open(path).unwrap();
-                            let mut reader = io::BufReader::new(file);
-                            let mut buffer = Vec::new();
-                            reader.read_to_end(&mut buffer).unwrap();
-                            let mut parser = RDBParser::new(&buffer);
-                            match parser.parse() {
-                                Ok(rdb) => {
-                                    for key in &rdb.get_values() {
-                                        stream.write_all(to_bulk_string(key).as_bytes()).unwrap();
-                                    }
-                                }
-                                Err(e) => {
-                                    eprintln!("Unable to parse rdb: {}", e)
-                                }
+                        let value = rdb.get(&key);
+                        match value {
+                            Some(value) => {
+                                stream.write_all(to_bulk_string(&value).as_bytes()).unwrap();
+                            }
+                            None => {
+                                stream.write_all(b"$-1\r\n").unwrap();
                             }
                         }
                     }
@@ -141,41 +149,19 @@ async fn handle_connection<T: Database>(
             Some(Command::Config(config_key)) => {
                 let config = config.lock().unwrap();
                 if let Some(config_value) = config.get(&config_key) {
-                    stream
-                        .write_all(config.encode_to_resp(&config_key, config_value).as_slice())
-                        .unwrap();
+                    stream.write_all(config.encode_to_resp(&config_key, config_value).as_slice())?
                 } else {
                     stream.write_all(b"$-1\r\n").unwrap();
                 }
             }
 
             Some(Command::Keys(keys)) => {
-                let config = config.lock().unwrap();
-
                 if keys.as_str() == "*" {
-                    if let Some(path) = config.to_file_path() {
-                        let file = File::open(path).unwrap();
-                        let mut reader = io::BufReader::new(file);
-                        let mut buffer = Vec::new();
-                        reader.read_to_end(&mut buffer).unwrap();
-                        let mut parser = RDBParser::new(&buffer);
-                        match parser.parse() {
-                            Ok(rdb) => {
-                                stream
-                                    .write_all(to_list_of_bulk_strings(&rdb.get_keys()).as_bytes())
-                                    .unwrap();
-                            }
-                            Err(e) => {
-                                eprintln!("unable to parse rdb: {}", e)
-                            }
-                        }
-                    }
+                    stream.write_all(to_list_of_bulk_strings(&rdb.get_keys()).as_bytes())?
                 }
             }
 
-            None => stream
-                .write_all(b"-ERR unknown command\r\n")
-                .expect("could not write to stream"),
+            None => stream.write_all(b"-ERR unknown command\r\n")?,
         }
     }
     Ok(())
@@ -198,7 +184,12 @@ async fn main() -> Result<()> {
                 let db = Arc::clone(&db);
                 let config = Arc::clone(&config);
                 tokio::task::spawn(async move {
-                    let _ = handle_connection(stream, db, config).await;
+                    match handle_connection(stream, db, config).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            eprintln!("Failure while handling connection: {}", e);
+                        }
+                    }
                 });
             }
             Err(e) => {
