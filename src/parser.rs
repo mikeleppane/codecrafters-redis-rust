@@ -100,10 +100,25 @@ impl RDBParser<'_> {
             dbg!(byte);
             match byte {
                 0xFF => break,
-                0xFE => {
-                    let db = self.read_length()?;
-                    rdb.select_db(db);
+                0xFA => {
+                    while let Ok(byte) = self.read_byte() {
+                        if byte == 0xFF || byte == 0xFA || byte == 0xFE {
+                            self.pos -= 1;
+                            break;
+                        }
+                    }
+                    continue;
                 }
+                0xFE => {
+                    let _ = self.read_length()?;
+                    continue;
+                }
+
+                0xFB => {
+                    let _ = self.read_length()?;
+                    continue;
+                }
+
                 0xFD => {
                     let (db, expires) = self.read_expiry()?;
                     rdb.select_db(db);
@@ -114,13 +129,9 @@ impl RDBParser<'_> {
                     rdb.select_db(db);
                     rdb.set_expiry_ms(expires);
                 }
-                0xFA => {
-                    let db = self.read_length()?;
-                    rdb.select_db(db);
-                    rdb.set_expiry(0);
-                }
 
                 _ => {
+                    dbg!(byte);
                     let db = rdb.current_db();
                     let expires = rdb.current_expiry();
                     let key = self.read_string()?;
@@ -130,6 +141,18 @@ impl RDBParser<'_> {
             }
         }
         Ok(())
+    }
+
+    fn read_until(&mut self, byte: u8) -> Result<Vec<u8>, RDBError> {
+        let mut buf = Vec::new();
+        loop {
+            let b = self.read_byte()?;
+            if b == byte {
+                break;
+            }
+            buf.push(b);
+        }
+        Ok(buf)
     }
 
     fn read(&mut self, buf: &mut [u8]) -> Result<(), RDBError> {
