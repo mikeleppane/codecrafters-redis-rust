@@ -168,6 +168,7 @@ impl RDBParser<'_> {
         }
     }
 
+    #[allow(dead_code)]
     fn read_expiry(&mut self) -> Result<(u32, u64), RDBError> {
         let db = self.read_length()?;
         let mut buf = [0u8; 8];
