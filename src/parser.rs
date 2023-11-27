@@ -97,45 +97,19 @@ impl RDBParser<'_> {
     fn parse_body(&mut self, rdb: &mut RDB) -> Result<(), RDBError> {
         loop {
             let byte = self.read_byte()?;
-            dbg!(byte);
-            match byte {
-                0xFF => break,
-                0xFA => {
-                    while let Ok(byte) = self.read_byte() {
-                        if byte == 0xFF || byte == 0xFA || byte == 0xFE {
-                            self.pos -= 1;
-                            break;
-                        }
+            if byte == 0xFF {
+                break;
+            }
+            if byte == 0xFA {
+                while let Ok(byte) = self.read_byte() {
+                    if byte == 0xFF || byte == 0xFA || byte == 0xFE {
+                        self.pos -= 1;
+                        break;
                     }
                 }
-                0xFE => {
-                    let _ = self.read_length()?;
-                }
-
-                0xFB => {
-                    let _ = self.read_length()?;
-                }
-
-                0xFD => {
-                    let (db, expires) = self.read_expiry()?;
-                    rdb.select_db(db);
-                    rdb.set_expiry(expires);
-                }
-                0xFC => {
-                    let (db, expires) = self.read_expiry()?;
-                    rdb.select_db(db);
-                    rdb.set_expiry_ms(expires);
-                }
-
-                _ => {
-                    println!("{:#04X?}", byte);
-                    let db = rdb.current_db();
-                    let expires = rdb.current_expiry();
-                    let key = self.read_string()?;
-                    let value = self.read_object(byte)?;
-                    rdb.add_object(db, expires, key, value);
-                }
+                continue;
             }
+            println!("{:#04X?}", byte);
         }
         Ok(())
     }
