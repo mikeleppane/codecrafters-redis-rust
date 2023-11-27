@@ -125,7 +125,7 @@ async fn handle_connection<T: Database>(
                             let mut parser = RDBParser::new(&buffer);
                             match parser.parse() {
                                 Ok(rdb) => {
-                                    for key in &rdb.get_keys() {
+                                    for key in &rdb.get_values() {
                                         stream.write_all(to_bulk_string(key).as_bytes()).unwrap();
                                     }
                                 }

@@ -52,6 +52,10 @@ impl Rdb {
     pub fn get_keys(&self) -> Vec<String> {
         self.data.keys().cloned().collect()
     }
+
+    pub fn get_values(&self) -> Vec<String> {
+        self.data.values().map(|v| v.to_string()).collect()
+    }
 }
 
 pub struct RDBParser<'a> {
