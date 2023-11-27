@@ -155,8 +155,10 @@ impl RDBParser<'_> {
 
             println!("{:#04X?}", byte);
             if byte == 0xFD {
-                /* let mut buf = [0u8; 4];
+                let mut buf = [0u8; 4];
                 self.read(&mut buf)?;
+                println!("{:#04X?}", buf);
+                /*
                 let expiry_in_ms = (u32::from_le_bytes(buf) * 1000) as u64;
                 let key = self.read_string()?;
                 let value = self.read_object(byte)?;
@@ -165,9 +167,11 @@ impl RDBParser<'_> {
             }
 
             if byte == 0xFC {
-                /* let mut buf = [0u8; 8];
+                let mut buf = [0u8; 8];
                 self.read(&mut buf)?;
+                println!("{:#04X?}", buf);
                 let expiry_in_ms = u64::from_le_bytes(buf);
+                /*
                 let key = self.read_string()?;
                 let value = self.read_object(byte)?;
                 rdb.add_object(key, value, Some(expiry_in_ms)); */
