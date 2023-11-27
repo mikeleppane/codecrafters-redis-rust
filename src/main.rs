@@ -6,6 +6,7 @@ use std::{
     net::{TcpListener, TcpStream},
     path::PathBuf,
     sync::{Arc, Mutex},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 mod command;
@@ -137,8 +138,10 @@ async fn handle_connection<T: Database>(
                         match value {
                             Some(value) => {
                                 if value.expiry.is_some() {
-                                    let now = std::time::SystemTime::now();
-                                    if value.expiry.unwrap() <= now {
+                                    let start = SystemTime::now();
+                                    let since_the_epoch =
+                                        start.duration_since(UNIX_EPOCH).unwrap().as_millis();
+                                    if value.expiry.unwrap() as u128 <= since_the_epoch {
                                         stream.write_all(b"$-1\r\n").unwrap();
                                         rdb.delete(&key);
                                         continue;

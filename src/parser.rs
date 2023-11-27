@@ -25,7 +25,7 @@ pub enum RDBError {
 #[derive(Debug)]
 pub struct RdbValue {
     pub value: Value,
-    pub expiry: Option<SystemTime>,
+    pub expiry: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -56,14 +56,11 @@ impl Rdb {
 
     pub fn add_object(&mut self, key: String, value: Value, expiry: Option<u64>) {
         if let Some(expiry) = expiry {
-            let now = SystemTime::now();
-            let expiry_duration = Duration::from_millis(expiry);
-            let expires_at = now + expiry_duration;
             self.data.insert(
                 key,
                 RdbValue {
                     value,
-                    expiry: Some(expires_at),
+                    expiry: Some(expiry),
                 },
             );
         } else {
@@ -152,13 +149,10 @@ impl RDBParser<'_> {
                 self.read(&mut buf)?;
                 continue;
             }
-
-            println!("{:#04X?}", byte);
             if byte == 0xFD {
                 let mut buf = [0u8; 4];
                 self.read(&mut buf)?;
                 let expiry_in_ms = (u32::from_le_bytes(buf) * 1000) as u64;
-                println!("FD => expiry {}", expiry_in_ms);
                 let byte = self.read_byte()?;
                 let key = self.read_string()?;
                 let value = self.read_object(byte)?;
@@ -169,9 +163,7 @@ impl RDBParser<'_> {
             if byte == 0xFC {
                 let mut buf = [0u8; 8];
                 self.read(&mut buf)?;
-                println!("{:#04X?}", buf);
                 let expiry_in_ms = u64::from_le_bytes(buf);
-                println!("FC => expiry {}", expiry_in_ms);
                 let byte = self.read_byte()?;
                 let key = self.read_string()?;
                 let value = self.read_object(byte)?;
