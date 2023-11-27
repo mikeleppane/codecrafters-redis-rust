@@ -6,8 +6,9 @@ use std::{
     net::{TcpListener, TcpStream},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
+    time::Duration,
 };
-use tokio::fs::metadata;
+use tokio::{fs::metadata, time::sleep};
 
 mod command;
 mod config;
@@ -199,10 +200,10 @@ async fn main() -> Result<()> {
 
     let db = Arc::new(Mutex::new(RedisDatabase::new()));
     let config = Arc::new(Mutex::new(Config::new(args.dir, args.dbfilename)));
+    sleep(Duration::from_millis(1000)).await;
     let path = config.lock().unwrap().to_file_path();
     if path.is_some() {
-        let path: String = path.unwrap().to_str().unwrap().trim().to_string();
-        match metadata(path).await {
+        match metadata(path.unwrap()).await {
             Ok(_) => println!("File exists!"),
             Err(_) => println!("File does not exist!"),
         }
