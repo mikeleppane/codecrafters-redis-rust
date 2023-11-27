@@ -115,7 +115,28 @@ async fn handle_connection<T: Database>(
                             .write_all(encode_response(value.as_bytes()).as_slice())
                             .unwrap();
                     }
-                    GetValue::None => {}
+                    GetValue::None => {
+                        let config = config.lock().unwrap();
+                        if let Some(path) = config.to_file_path() {
+                            let file = File::open(path).unwrap();
+                            let mut reader = io::BufReader::new(file);
+                            let mut buffer = Vec::new();
+                            reader.read_to_end(&mut buffer).unwrap();
+                            let mut parser = RDBParser::new(&buffer);
+                            match parser.parse() {
+                                Ok(rdb) => {
+                                    stream
+                                        .write_all(
+                                            to_list_of_bulk_strings(&rdb.get_keys()).as_bytes(),
+                                        )
+                                        .unwrap();
+                                }
+                                Err(e) => {
+                                    eprintln!("unable to parse rdb: {}", e)
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
