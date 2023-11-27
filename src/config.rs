@@ -1,5 +1,5 @@
+use crate::encoding::to_bulk_string;
 use std::path::PathBuf;
-
 pub struct Config {
     pub dir: Option<PathBuf>,
     pub dbfilename: Option<String>,
@@ -32,9 +32,4 @@ impl Config {
         buffer.extend_from_slice(to_bulk_string(value).as_bytes());
         buffer
     }
-}
-
-fn to_bulk_string(s: &str) -> String {
-    let len = s.len();
-    format!("${}\r\n{}\r\n", len, s)
 }

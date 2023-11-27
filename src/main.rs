@@ -11,11 +11,13 @@ use std::{
 mod command;
 mod config;
 mod db;
+mod encoding;
 mod parser;
 mod response;
 use crate::config::Config;
 use command::{Command, SetCommand};
 use db::{Database, GetValue, RedisDatabase};
+use encoding::to_list_of_bulk_strings;
 use parser::RDBParser;
 use response::{RespParser, Value};
 
@@ -138,11 +140,15 @@ async fn handle_connection<T: Database>(
                         let mut buffer = Vec::new();
                         reader.read_to_end(&mut buffer).unwrap();
                         let mut parser = RDBParser::new(&buffer);
-                        if let Ok(rdb) = parser.parse() {
-                            dbg!("OK");
-                            dbg!(rdb);
-                        } else {
-                            dbg!("error while parsing header");
+                        match parser.parse() {
+                            Ok(rdb) => {
+                                stream
+                                    .write_all(to_list_of_bulk_strings(&rdb.get_keys()).as_bytes())
+                                    .unwrap();
+                            }
+                            Err(e) => {
+                                eprintln!("unable to parse rdb: {}", e)
+                            }
                         }
                     }
                 }

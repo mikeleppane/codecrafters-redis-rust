@@ -1,6 +1,9 @@
-use crate::response::Value;
+use std::collections::HashMap;
 
-#[derive(thiserror::Error, Debug)]
+use crate::response::Value;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
 pub enum RDBError {
     #[error("invalid magic number")]
     InvalidMagicNumber,
@@ -19,14 +22,8 @@ pub enum RDBError {
 #[derive(Debug)]
 pub struct Rdb {
     version: u8,
-    #[allow(dead_code)]
     db: u32,
-    #[allow(dead_code)]
-    expiry: u64,
-    #[allow(dead_code)]
-    checksum: u64,
-    #[allow(dead_code)]
-    data: Vec<(String, Value)>,
+    data: HashMap<String, Value>,
 }
 
 impl Rdb {
@@ -34,14 +31,12 @@ impl Rdb {
         Rdb {
             version: 0,
             db: 0,
-            expiry: 0,
-            checksum: 0,
-            data: Vec::new(),
+            data: HashMap::new(),
         }
     }
 
     #[allow(dead_code)]
-    pub fn select_db(&mut self, db: u32) {
+    pub fn set_db(&mut self, db: u32) {
         self.db = db;
     }
 
@@ -50,23 +45,12 @@ impl Rdb {
         self.db
     }
 
-    #[allow(dead_code)]
-    pub fn set_expiry(&mut self, expiry: u64) {
-        self.expiry = expiry;
+    pub fn add_object(&mut self, key: String, value: Value) {
+        self.data.insert(key, value);
     }
 
-    pub fn set_expiry_ms(&mut self, expiry: u64) {
-        self.expiry = expiry * 1000;
-    }
-
-    pub fn current_expiry(&self) -> u64 {
-        self.expiry
-    }
-
-    pub fn add_object(&mut self, db: u32, expiry: u64, key: String, value: Value) {
-        self.db = db;
-        self.expiry = expiry;
-        self.data.push((key, value));
+    pub fn get_keys(&self) -> Vec<String> {
+        self.data.keys().cloned().collect()
     }
 }
 
@@ -118,7 +102,8 @@ impl RDBParser<'_> {
             }
 
             if byte == 0xFE {
-                let _ = self.read_byte();
+                let db_number = self.read_length()?;
+                rdb.set_db(db_number);
                 continue;
             }
 
@@ -137,10 +122,7 @@ impl RDBParser<'_> {
             }
             let key = self.read_string()?;
             let value = self.read_object(byte)?;
-
-            println!("key: {}, value: {:?}", key, value);
-
-            println!("{:#04X?}", byte);
+            rdb.add_object(key, value);
         }
         Ok(())
     }

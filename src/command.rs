@@ -35,12 +35,8 @@ impl Command {
                     .join(" "),
             )),
             "SET" => {
-                if args.len() > 4 {
-                    eprintln!("wrong number of arguments for 'set' command");
-                    return None;
-                }
-                if args.len() < 2 {
-                    eprintln!("wrong number of arguments for 'set' command");
+                if args.len() > 4 || args.len() < 2 {
+                    eprintln!("SET command requires 2 or 4 arguments; got {}", args.len());
                     return None;
                 }
 
@@ -54,7 +50,7 @@ impl Command {
                             )))
                         }
                         _ => {
-                            eprintln!("wrong type of arguments for 'set' command");
+                            eprintln!("Wrong type of arguments for 'SET' command; got {:?}", args);
                             return None;
                         }
                     }
@@ -69,7 +65,7 @@ impl Command {
                         ) => {
                             if px.to_uppercase() != "PX" {
                                 eprintln!(
-                                    "wrong type of arguments for 'set' command; expecting PX, got {}", px
+                                    "Wrong type of arguments for 'SET' command; expecting PX, got {}", px
                                 );
                                 return None;
                             }
@@ -87,23 +83,25 @@ impl Command {
                             )));
                         }
                         _ => {
-                            eprintln!("wrong type of arguments for 'set' command");
+                            eprintln!("Wrong type of arguments for 'SET' command; got {:?}", args);
                             return None;
                         }
                     }
                 }
-                eprintln!("wrong type of arguments for 'set' command; got {:?}", args);
                 None
             }
             "GET" => {
                 if args.len() != 1 {
-                    eprintln!("wrong number of arguments for 'get' command");
+                    eprintln!(
+                        "Wrong number of arguments for 'GET' command; got {}",
+                        args.len()
+                    );
                     return None;
                 }
                 match &args[0] {
                     Value::String(key) => Some(Command::Get(key.clone())),
                     _ => {
-                        eprintln!("wrong type of arguments for 'get' command");
+                        eprintln!("Wrong type of arguments for 'GET' command; got {:?}", args);
                         None
                     }
                 }
@@ -112,32 +110,41 @@ impl Command {
                 "GET" => match &args[1] {
                     Value::String(config_value) => Some(Command::Config(config_value.clone())),
                     _ => {
-                        eprintln!("wrong type of arguments for 'config' command");
+                        eprintln!(
+                            "Wrong type of arguments for 'CONFIG' command; got {:?}",
+                            args
+                        );
                         None
                     }
                 },
                 _ => {
-                    eprintln!("unknown command '{}'", name);
+                    eprintln!("Unknown command '{}'; expecting CONFIG GET", name);
                     None
                 }
             },
 
             "KEYS" => {
                 if args.len() != 1 {
-                    eprintln!("wrong number of arguments for 'keys' command");
+                    eprintln!(
+                        "Wrong number of arguments for 'KEYS' command; got {}",
+                        args.len()
+                    );
                     return None;
                 }
                 match &args[0] {
                     Value::String(key) => Some(Command::Keys(key.clone())),
                     _ => {
-                        eprintln!("wrong type of arguments for 'get' command");
+                        eprintln!("Wrong type of arguments for 'KEYS' command; got {:?}", args);
                         None
                     }
                 }
             }
 
             _ => {
-                eprintln!("unknown command '{}'", name);
+                eprintln!(
+                    "Unknown command '{}'; expecting PING, ECHO, SET, GET, CONFIG, KEYS",
+                    name
+                );
                 None
             }
         }
@@ -149,7 +156,7 @@ impl Command {
         match command_name {
             Value::String(name) => Command::process(name, command_args),
             _ => {
-                eprintln!("unexpected token: {:?}", command_name);
+                eprintln!("Unexpected command: {:?}", command_name);
                 None
             }
         }
